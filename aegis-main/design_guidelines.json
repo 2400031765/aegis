@@ -1,0 +1,153 @@
+{
+  "theme_archetype": "Archetype 5 (Jewel & Luxury / Dark) with Electric Tech Accents",
+  "concept": "A cinematic, premium dark-mode experience that feels protective, highly intelligent, and exclusive. Avoids 'alarmist' red aesthetics in favor of commanding, reassuring deep purples and magenta glows.",
+  "colors": {
+    "background": {
+      "base": "#06040A",
+      "surface": "#0E0914",
+      "surface_elevated": "#181124"
+    },
+    "brand": {
+      "primary": "#7000FF",
+      "secondary": "#FF2079",
+      "gradient_start": "#7000FF",
+      "gradient_mid": "#B800E6",
+      "gradient_end": "#FF2079"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A19EB5",
+      "tertiary": "#6C6885"
+    },
+    "strokes": {
+      "glass": "rgba(255, 255, 255, 0.12)",
+      "accent": "rgba(112, 0, 255, 0.4)"
+    },
+    "status": {
+      "active": "#00F0FF",
+      "warning": "#FFB800",
+      "danger": "#FF2079"
+    }
+  },
+  "typography": {
+    "family": {
+      "heading": "Outfit",
+      "body": "PlusJakartaSans"
+    },
+    "scale": {
+      "h1": { "fontSize": 48, "lineHeight": 52, "fontWeight": "800", "letterSpacing": -1.5 },
+      "h2": { "fontSize": 36, "lineHeight": 40, "fontWeight": "700", "letterSpacing": -1 },
+      "h3": { "fontSize": 24, "lineHeight": 32, "fontWeight": "600", "letterSpacing": -0.5 },
+      "body_lg": { "fontSize": 18, "lineHeight": 28, "fontWeight": "400", "letterSpacing": 0 },
+      "body_base": { "fontSize": 16, "lineHeight": 24, "fontWeight": "400", "letterSpacing": 0 },
+      "label": { "fontSize": 13, "lineHeight": 18, "fontWeight": "600", "letterSpacing": 1.2, "textTransform": "uppercase" }
+    }
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32,
+    "xxl": 48,
+    "hero": 64,
+    "screen_padding": 24
+  },
+  "glassmorphism": {
+    "card": {
+      "backgroundColor": "rgba(20, 15, 30, 0.4)",
+      "borderColor": "rgba(255, 255, 255, 0.08)",
+      "borderWidth": 1,
+      "borderRadius": 24,
+      "blurTint": "dark",
+      "blurIntensity": 30
+    },
+    "button": {
+      "backgroundColor": "rgba(255, 255, 255, 0.1)",
+      "borderColor": "rgba(255, 255, 255, 0.15)",
+      "borderWidth": 1,
+      "borderRadius": 100,
+      "blurTint": "dark",
+      "blurIntensity": 20
+    }
+  },
+  "animations": {
+    "durations": {
+      "fast": 200,
+      "medium": 500,
+      "slow": 1000,
+      "cinematic": 2000
+    },
+    "easings": {
+      "outExpo": "cubic-bezier(0.19, 1, 0.22, 1)",
+      "inOutSine": "cubic-bezier(0.45, 0, 0.55, 1)"
+    }
+  },
+  "screens": {
+    "splash": {
+      "layout": "Centered vertically and horizontally. Full screen absolute background glow.",
+      "sequence": [
+        { "step": 1, "element": "Logo Icon", "action": "Fade in + Scale from 0.8 to 1.0", "delay": 0, "duration": 1000 },
+        { "step": 2, "element": "Logo Icon", "action": "Translate Y up by -80px", "delay": 1200, "duration": 800 },
+        { "step": 3, "element": "AEGIS Typography", "action": "Fade in below icon", "delay": 1500, "duration": 800 },
+        { "step": 4, "element": "Adaptive Emergency Guidance...", "action": "Fade in + Slide up 10px", "delay": 2200, "duration": 800 },
+        { "step": 5, "element": "For the safety of women...", "action": "Fade in + Slide up 10px", "delay": 3000, "duration": 800 },
+        { "step": 6, "element": "AI Description Text", "action": "Fade in with subtle glow behind", "delay": 4000, "duration": 1200 }
+      ],
+      "styling": {
+        "title": "h1 scale, text-transparent with linear gradient brand colors",
+        "taglines": "body_lg scale, text.secondary, centered",
+        "ai_desc": "body_base scale, text.tertiary, max-width 80%, centered, italicized"
+      }
+    },
+    "intro_onboarding": {
+      "layout": "Flex column, space-between. Top: Logo + Neural Shield Graphic. Bottom: Value Prop + CTA.",
+      "elements": {
+        "hero_image": "Use the neural_shield media absolute or heavily sized at center-top with 50% opacity mask.",
+        "text_container": "Bottom anchored, padded 32px.",
+        "title": "H2, stark white. 'Your AI Safety Companion.'",
+        "subtitle": "Body_lg, secondary text. 'Proactive protection, anywhere in the world.'",
+        "cta_button": {
+          "style": "Full width, height 64px, pill shape (borderRadius: 32). Background linear gradient (Purple to Pink). Text white, H3 scale but bold.",
+          "interaction": "Scale down 0.95 on press."
+        }
+      }
+    },
+    "language_selection": {
+      "layout": "Screen padding 24px. Header top-left. ScrollView for cards. Floating CTA at bottom.",
+      "elements": {
+        "header": "Logo icon scaled down top-left. H2 Title 'Select Language' below it. Subtitle 'You can change this anytime.'",
+        "card_list": "Vertical list of cards, gap 16px.",
+        "card_item": {
+          "style": "Glassmorphism card specs. Height 80px. Flex row, align center, padding horizontal 24px. Left: Flag icon + Language Name. Right: Subdued Language Code (e.g., EN, ES).",
+          "selected_state": "Border color becomes Primary Purple, subtle inner purple glow (box-shadow/elevation), text becomes white.",
+          "unselected_state": "Standard glassmorphism border, text secondary."
+        },
+        "bottom_cta": "Absolute bottom, width 100%, padding 24px. Glassmorphism blur container behind it to prevent cutoff. 'Continue' button matches Intro CTA style."
+      }
+    }
+  },
+  "media": {
+    "logo": {
+      "url": "/app/frontend/assets/images/aegis-logo.png",
+      "treatment": "CRITICAL: Logo has a white background. Use React Native Image style with 'tintColor' to extract the mask, OR use a circular/shield-shaped MaskedView. If rendering fully, put it inside a glassmorphism pill so the white background looks intentional. Best approach for splash: render with 'overlay' or 'multiply' blend mode if possible, or crop tightly."
+    },
+    "background_glow": {
+      "url": "/app/frontend/assets/images/bg-glow.png",
+      "description": "Abstract fluid dark background with magenta and purple glows. Use absolute fill behind the Splash and Intro screens."
+    },
+    "neural_shield": {
+      "url": "/app/frontend/assets/images/neural-shield.png",
+      "description": "3D neon purple shield nodes. Use as hero visual in Intro/Onboarding."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use expo-linear-gradient for all color gradients.",
+    "Use expo-blur for the glassmorphism effects. Ensure `tint=\"dark\"` is used.",
+    "Animations must be implemented using React Native Reanimated or standard Animated API. Do not skip the staggered timing on the splash screen.",
+    "The UI must feel extremely premium. Adhere strictly to the Spacing tokens. Do not center everything on the language selection page (follow optical left alignment).",
+    "All interactive elements MUST have `testID` attribute (React Native equivalent of data-testid).",
+    "Install `@expo-google-fonts/outfit` and `@expo-google-fonts/plus-jakarta-sans`.",
+    "Apply `SafeAreaView` so content does not bleed into the device notch or home indicator."
+  ]
+}
