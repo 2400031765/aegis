@@ -19,9 +19,11 @@ import { Text } from '../../src/components/Text';
 import { colors, spacing } from '../../src/theme';
 import { useAuthStore } from '../../src/store/authStore';
 import { validators } from '../../src/services/auth';
+import { useTranslation } from '../../src/hooks/useTranslation';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const signUp = useAuthStore((s) => s.signUp);
   const loading = useAuthStore((s) => s.loading);
 
@@ -35,10 +37,10 @@ export default function SignupScreen() {
 
   const validate = () => {
     const next: typeof errors = {};
-    if (!validators.name(name)) next.name = 'Please enter your full name.';
-    if (!validators.email(email)) next.email = 'Please enter a valid email address.';
-    if (!validators.password(password)) next.password = 'Password must be at least 6 characters.';
-    if (password !== confirm) next.confirm = 'Passwords do not match.';
+    if (!validators.name(name)) next.name = t('auth.nameRequired');
+    if (!validators.email(email)) next.email = t('auth.invalidEmail');
+    if (!validators.password(password)) next.password = t('auth.weakPassword');
+    if (password !== confirm) next.confirm = t('auth.mismatch');
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -49,7 +51,7 @@ export default function SignupScreen() {
       await signUp(email, password, name);
       router.replace('/(app)/dashboard');
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Could not create account.';
+      const msg = e instanceof Error ? e.message : t('auth.createFailed');
       setErrors({ form: msg });
     }
   };
@@ -66,14 +68,14 @@ export default function SignupScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <AuthHeader title="Create your account" subtitle="Join AEGIS — your personal safety companion." />
+            <AuthHeader title={t('auth.createAccount')} subtitle={t('auth.createAccountSub')} />
 
             <View style={styles.form}>
               <FormField
                 testID="signup-name"
-                label="Full name"
+                label={t('auth.fullName')}
                 icon="person-outline"
-                placeholder="Jane Doe"
+                placeholder={t('auth.fullNamePlaceholder')}
                 value={name}
                 onChangeText={setName}
                 error={errors.name}
@@ -81,9 +83,9 @@ export default function SignupScreen() {
               />
               <FormField
                 testID="signup-email"
-                label="Email"
+                label={t('auth.email')}
                 icon="mail-outline"
-                placeholder="you@example.com"
+                placeholder={t('auth.emailPlaceholder')}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -92,9 +94,9 @@ export default function SignupScreen() {
               />
               <FormField
                 testID="signup-password"
-                label="Password"
+                label={t('auth.password')}
                 icon="lock-closed-outline"
-                placeholder="At least 6 characters"
+                placeholder={t('auth.passwordPlaceholder')}
                 isPassword
                 value={password}
                 onChangeText={setPassword}
@@ -102,9 +104,9 @@ export default function SignupScreen() {
               />
               <FormField
                 testID="signup-confirm"
-                label="Confirm password"
+                label={t('auth.passwordConfirm')}
                 icon="shield-checkmark-outline"
-                placeholder="Re-enter password"
+                placeholder={t('auth.confirmPlaceholder')}
                 isPassword
                 value={confirm}
                 onChangeText={setConfirm}
@@ -118,7 +120,7 @@ export default function SignupScreen() {
               ) : null}
 
               <GradientButton
-                label={loading ? 'Creating account…' : 'Create Account'}
+                label={loading ? t('auth.creatingAccount') : t('auth.signup')}
                 testID="signup-submit-btn"
                 onPress={onSubmit}
                 disabled={loading}
@@ -128,7 +130,7 @@ export default function SignupScreen() {
 
               <View style={styles.footerRow}>
                 <Text variant="bodySm" color={colors.text.secondary}>
-                  Already have an account?
+                  {t('auth.haveAccount')}
                 </Text>
                 <Pressable
                   testID="signup-go-login"
@@ -136,7 +138,7 @@ export default function SignupScreen() {
                   hitSlop={8}
                 >
                   <Text variant="bodySm" color={colors.brand.secondary} weight="bold">
-                    Sign In
+                    {t('auth.signinCta')}
                   </Text>
                 </Pressable>
               </View>

@@ -20,9 +20,11 @@ import { FormField } from '../../src/components/FormField';
 import { Text } from '../../src/components/Text';
 import { colors, spacing, radii } from '../../src/theme';
 import { useContactsStore } from '../../src/store/contactsStore';
+import { useTranslation } from '../../src/hooks/useTranslation';
 
 export default function ContactsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const contacts = useContactsStore((s) => s.contacts);
   const hydrate = useContactsStore((s) => s.hydrate);
   const addContact = useContactsStore((s) => s.addContact);
@@ -41,8 +43,8 @@ export default function ContactsScreen() {
 
   const onAdd = async () => {
     const next: typeof errors = {};
-    if (name.trim().length < 2) next.name = 'Please enter the contact name.';
-    if (phone.trim().length < 6) next.phone = 'Enter a valid phone number.';
+    if (name.trim().length < 2) next.name = t('contacts.nameError');
+    if (phone.trim().length < 6) next.phone = t('contacts.phoneError');
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -54,9 +56,9 @@ export default function ContactsScreen() {
   };
 
   const confirmRemove = (id: string) => {
-    Alert.alert('Remove contact?', 'They will no longer receive AEGIS emergency alerts.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removeContact(id) },
+    Alert.alert(t('contacts.removeTitle'), t('contacts.removeMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('contacts.remove'), style: 'destructive', onPress: () => removeContact(id) },
     ]);
   };
 
@@ -95,15 +97,15 @@ export default function ContactsScreen() {
 
             {/* Hero */}
             <View style={styles.hero}>
-              <Text variant="label" color={colors.brand.secondary}>Trusted Circle</Text>
+              <Text variant="label" color={colors.brand.secondary}>{t('contacts.eyebrow')}</Text>
               <Text variant="h2" weight="bold" style={{ marginTop: spacing.sm }}>
-                Who should{'\n'}
-                <Text variant="h2" weight="bold" color={colors.brand.secondary}>know first?</Text>
+                {t('contacts.title')}{'\n'}
+                <Text variant="h2" weight="bold" color={colors.brand.secondary}>{t('contacts.titleAccent')}</Text>
               </Text>
               <Text variant="bodyBase" color={colors.text.secondary} style={{ marginTop: spacing.sm, maxWidth: 360 }}>
                 {contacts.length === 0
-                  ? 'Add the people who should be alerted instantly during an emergency.'
-                  : `${selectedCount} of ${contacts.length} contacts will be notified when you trigger an SOS.`}
+                  ? t('contacts.subtitleEmpty')
+                  : t('contacts.subtitleSelected', { selected: selectedCount, total: contacts.length })}
               </Text>
             </View>
 
@@ -151,10 +153,10 @@ export default function ContactsScreen() {
                 <GlassCard style={styles.emptyCard}>
                   <Ionicons name="people-outline" size={32} color={colors.brand.secondary} />
                   <Text variant="bodyBase" weight="semi" style={{ textAlign: 'center', marginTop: spacing.sm }}>
-                    No trusted contacts yet
+                    {t('contacts.noContacts')}
                   </Text>
                   <Text variant="bodySm" color={colors.text.secondary} style={{ textAlign: 'center' }}>
-                    Add at least one trusted person so AEGIS can alert them in an emergency.
+                    {t('contacts.noContactsDesc')}
                   </Text>
                 </GlassCard>
               ) : null}
@@ -163,21 +165,21 @@ export default function ContactsScreen() {
             {/* Add form */}
             {adding ? (
               <GlassCard style={styles.formCard}>
-                <Text variant="bodyBase" weight="bold">New trusted contact</Text>
+                <Text variant="bodyBase" weight="bold">{t('contacts.newContact')}</Text>
                 <FormField
                   testID="contact-name"
-                  label="Name"
+                  label={t('contacts.nameLabel')}
                   icon="person-outline"
-                  placeholder="e.g. Mom"
+                  placeholder={t('contacts.namePlaceholder')}
                   value={name}
                   onChangeText={setName}
                   error={errors.name}
                 />
                 <FormField
                   testID="contact-phone"
-                  label="Phone"
+                  label={t('contacts.phoneLabel')}
                   icon="call-outline"
-                  placeholder="+91 98765 43210"
+                  placeholder={t('contacts.phonePlaceholder')}
                   keyboardType="phone-pad"
                   value={phone}
                   onChangeText={setPhone}
@@ -185,9 +187,9 @@ export default function ContactsScreen() {
                 />
                 <FormField
                   testID="contact-relation"
-                  label="Relation (optional)"
+                  label={t('contacts.relationLabel')}
                   icon="heart-outline"
-                  placeholder="Sister, Friend, Partner…"
+                  placeholder={t('contacts.relationPlaceholder')}
                   value={relation}
                   onChangeText={setRelation}
                 />
@@ -197,10 +199,10 @@ export default function ContactsScreen() {
                     onPress={() => setAdding(false)}
                     style={styles.secondaryBtn}
                   >
-                    <Text variant="bodyBase" weight="semi">Cancel</Text>
+                    <Text variant="bodyBase" weight="semi">{t('common.cancel')}</Text>
                   </Pressable>
                   <View style={{ flex: 1 }}>
-                    <GradientButton label="Save" testID="contact-save-btn" onPress={onAdd} />
+                    <GradientButton label={t('contacts.save')} testID="contact-save-btn" onPress={onAdd} />
                   </View>
                 </View>
               </GlassCard>
@@ -209,7 +211,7 @@ export default function ContactsScreen() {
                 <GlassCard style={styles.addBtn}>
                   <Ionicons name="add-circle" size={22} color={colors.brand.secondary} />
                   <Text variant="bodyBase" weight="semi">
-                    Add trusted contact
+                    {t('contacts.addButton')}
                   </Text>
                 </GlassCard>
               </Pressable>

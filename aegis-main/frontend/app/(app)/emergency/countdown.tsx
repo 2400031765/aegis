@@ -9,9 +9,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text } from '../../../src/components/Text';
 import { useEmergencyStore } from '../../../src/store/emergencyStore';
 import { colors, spacing, radii } from '../../../src/theme';
+import { useTranslation } from '../../../src/hooks/useTranslation';
 
 export default function CountdownScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const phase = useEmergencyStore((s) => s.phase);
   const countdown = useEmergencyStore((s) => s.countdown);
   const tick = useEmergencyStore((s) => s.tickCountdown);
@@ -81,11 +83,10 @@ export default function CountdownScreen() {
         <View style={styles.content}>
           <View style={styles.headerBlock}>
             <Text variant="label" color="#FF99B8" style={styles.alertingLabel}>
-              ALERTING IN
+              {t('emergency.countdownTitle')}
             </Text>
             <Text variant="bodyBase" color={colors.text.secondary} style={styles.subtitle}>
-              Your trusted contacts will be notified, your live location shared,
-              and Smart Emergency Mode activated.
+              {t('emergency.countdownSubtitle')}
             </Text>
           </View>
 
@@ -116,7 +117,7 @@ export default function CountdownScreen() {
                 {countdown}
               </Animated.Text>
               <Text variant="label" color="#FFB0C8" style={{ marginTop: 4 }}>
-                SECONDS
+                {t('emergency.seconds')}
               </Text>
             </View>
           </View>
@@ -128,12 +129,12 @@ export default function CountdownScreen() {
           >
             <Ionicons name="close" size={22} color="#fff" />
             <Text variant="bodyLg" weight="bold" color="#fff">
-              Cancel Alert
+              {t('emergency.cancelAlert')}
             </Text>
           </Pressable>
 
           <Text variant="bodySm" color="#FFB0C8" style={styles.holdHint}>
-            False alarm? Tap cancel any time before the timer ends.
+            {t('emergency.countdownHint')}
           </Text>
         </View>
       </SafeAreaView>

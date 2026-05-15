@@ -1,9 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import {
-  getAuth,
-  initializeAuth,
-  type Auth,
-} from 'firebase/auth';
+import { getAuth, initializeAuth, type Auth, type Persistence } from 'firebase/auth';
+import * as FirebaseAuth from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
@@ -12,7 +9,6 @@ import { Platform } from 'react-native';
  * If keys are missing, the app runs in "demo mode" using local AsyncStorage
  * so the UI remains functional during development.
  */
-console.log(process.env.EXPO_PUBLIC_FIREBASE_API_KEY)
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -28,13 +24,35 @@ export const isFirebaseConfigured = !!(
   firebaseConfig.appId
 );
 
+
+
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 
+const getReactNativePersistence = (
+  FirebaseAuth as typeof FirebaseAuth & {
+    getReactNativePersistence?: (storage: typeof AsyncStorage) => Persistence;
+  }
+).getReactNativePersistence;
+
 if (isFirebaseConfigured) {
   app = getApps()[0] || initializeApp(firebaseConfig);
-  auth = getAuth(app);
+
+  if (Platform.OS === 'web') {
+    auth = getAuth(app);
+  } else {
+    try {
+      auth = getReactNativePersistence
+        ? initializeAuth(app, {
+          persistence: getReactNativePersistence(AsyncStorage),
+        })
+        : getAuth(app);
+    } catch {
+      auth = getAuth(app);
+    }
+  }
+
   db = getFirestore(app);
 }
 

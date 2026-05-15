@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { aiService, type AIChatResponse, type Risk, type AIAction, type SafePlace } from '../services/ai';
 import { locationService } from '../services/location';
+import { i18n } from '../i18n';
+import { useSafewordStore } from './safewordStore';
 
 export interface ChatMsg {
   id: string;
@@ -24,11 +26,16 @@ interface State {
   error: string | null;
   lastResponse: AIChatResponse | null;
   pendingStealth: boolean;
+  /** Last known GPS coordinates — used to generate accurate Maps navigation links */
+  lastLocation: { latitude: number; longitude: number } | null;
 }
 
 interface Actions {
   reset: () => void;
-  sendUserMessage: (text: string) => Promise<AIChatResponse | null>;
+  sendUserMessage: (
+    text: string,
+    location?: { latitude: number; longitude: number } | null,
+  ) => Promise<AIChatResponse | null>;
   pushAssistant: (msg: Omit<ChatMsg, 'id' | 'createdAt' | 'role'>) => void;
   consumeStealth: () => boolean;
   greet: () => void;
@@ -37,38 +44,39 @@ interface Actions {
 const newId = () => 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const newSession = () => 's-' + Date.now().toString(36);
 
-const GREETING: ChatMsg = {
+const getGreeting = (): ChatMsg => ({
   id: 'greeting',
   role: 'assistant',
-  content:
-    "Hello, I'm AEGIS AI.\nHow can I help keep you safe today?",
+  content: String(i18n.t('assistant.greeting')),
   risk: 'low',
-  reassurance: 'You are not alone. AEGIS is here, listening with you.',
+  reassurance: String(i18n.t('assistant.greetingReassurance')),
   createdAt: Date.now(),
-};
+});
 
 export const useChatStore = create<State & Actions>((set, get) => ({
   sessionId: newSession(),
-  messages: [GREETING],
+  messages: [getGreeting()],
   thinking: false,
   error: null,
   lastResponse: null,
   pendingStealth: false,
+  lastLocation: null,
 
   reset: () => {
     set({
       sessionId: newSession(),
-      messages: [{ ...GREETING, createdAt: Date.now() }],
+      messages: [getGreeting()],
       thinking: false,
       error: null,
       lastResponse: null,
       pendingStealth: false,
+      // preserve lastLocation across resets — GPS doesn't change
     });
   },
 
   greet: () => {
     if (get().messages.length === 0) {
-      set({ messages: [{ ...GREETING, createdAt: Date.now() }] });
+      set({ messages: [getGreeting()] });
     }
   },
 
@@ -82,7 +90,7 @@ export const useChatStore = create<State & Actions>((set, get) => ({
     set({ messages: [...get().messages, m] });
   },
 
-  sendUserMessage: async (text: string) => {
+  sendUserMessage: async (text: string, passedLocation?: { latitude: number; longitude: number } | null) => {
     const trimmed = text.trim();
     if (!trimmed) return null;
     const userMsg: ChatMsg = {
@@ -97,17 +105,23 @@ export const useChatStore = create<State & Actions>((set, get) => ({
       error: null,
     });
 
-    // Best-effort location capture — non-blocking on failure / denial.
-    let location: { latitude: number; longitude: number; accuracy?: number | null } | null = null;
-    try {
-      const perm = await locationService.ensurePermission();
-      if (perm.granted) {
-        const loc = await locationService.getCurrent();
-        location = { latitude: loc.latitude, longitude: loc.longitude, accuracy: loc.accuracy };
+    // Use passed location if provided, otherwise try to get it ourselves.
+    let location: { latitude: number; longitude: number; accuracy?: number | null } | null =
+      passedLocation ?? null;
+    if (!location) {
+      try {
+        const perm = await locationService.ensurePermission();
+        if (perm.granted) {
+          const loc = await locationService.getCurrent();
+          location = { latitude: loc.latitude, longitude: loc.longitude, accuracy: loc.accuracy };
+        }
+      } catch {
+        location = null;
       }
-    } catch {
-      location = null;
     }
+
+    // Pull the user's custom safeword for this request.
+    const extraSafewords = useSafewordStore.getState().getExtraSafewords();
 
     try {
       const history = get()
@@ -118,6 +132,7 @@ export const useChatStore = create<State & Actions>((set, get) => ({
         sessionId: get().sessionId,
         message: trimmed,
         history,
+        extraSafewords,
         location,
       });
 
@@ -141,10 +156,11 @@ export const useChatStore = create<State & Actions>((set, get) => ({
         thinking: false,
         lastResponse: resp,
         pendingStealth: resp.stealth_activate,
+        lastLocation: location ? { latitude: location.latitude, longitude: location.longitude } : get().lastLocation,
       });
       return resp;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'AEGIS could not reach the AI.';
+      const msg = e instanceof Error ? e.message : String(i18n.t('assistant.reachError'));
       set({
         thinking: false,
         error: msg,
@@ -153,8 +169,7 @@ export const useChatStore = create<State & Actions>((set, get) => ({
           {
             id: newId(),
             role: 'assistant',
-            content:
-              "I had trouble reaching my mind just now. I'm still right here with you — try again, or use the SOS button if it's urgent.",
+            content: String(i18n.t('assistant.reachErrorDetail')),
             risk: 'low',
             createdAt: Date.now(),
           },

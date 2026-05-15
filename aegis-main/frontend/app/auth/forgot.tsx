@@ -20,9 +20,11 @@ import { Text } from '../../src/components/Text';
 import { colors, spacing, radii } from '../../src/theme';
 import { useAuthStore } from '../../src/store/authStore';
 import { validators } from '../../src/services/auth';
+import { useTranslation } from '../../src/hooks/useTranslation';
 
 export default function ForgotScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const sendReset = useAuthStore((s) => s.sendReset);
   const loading = useAuthStore((s) => s.loading);
 
@@ -33,14 +35,14 @@ export default function ForgotScreen() {
   const onSubmit = async () => {
     setError(null);
     if (!validators.email(email)) {
-      setError('Please enter a valid email address.');
+      setError(t('forgot.invalidEmail'));
       return;
     }
     try {
       await sendReset(email);
       setSent(true);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Could not send reset email.';
+      const msg = e instanceof Error ? e.message : t('forgot.sendFailed');
       setError(msg);
     }
   };
@@ -57,16 +59,16 @@ export default function ForgotScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            <AuthHeader title="Reset your password" subtitle="Enter your email and we’ll send you a secure reset link." />
+            <AuthHeader title={t('forgot.title')} subtitle={t('forgot.subtitle')} />
 
             <View style={styles.form}>
               {!sent ? (
                 <>
                   <FormField
                     testID="forgot-email"
-                    label="Email"
+                    label={t('auth.email')}
                     icon="mail-outline"
-                    placeholder="you@example.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={email}
@@ -75,7 +77,7 @@ export default function ForgotScreen() {
                   />
 
                   <GradientButton
-                    label={loading ? 'Sending…' : 'Send Reset Link'}
+                    label={loading ? t('forgot.sending') : t('forgot.sendLink')}
                     testID="forgot-submit-btn"
                     onPress={onSubmit}
                     disabled={loading}
@@ -89,14 +91,14 @@ export default function ForgotScreen() {
                     <Ionicons name="mail-open-outline" size={28} color="#fff" />
                   </View>
                   <Text variant="h3" weight="bold" style={{ textAlign: 'center', marginTop: spacing.md }}>
-                    Check your inbox
+                    {t('forgot.checkInbox')}
                   </Text>
                   <Text variant="bodyBase" color={colors.text.secondary} style={styles.successDesc}>
-                    We sent a secure password reset link to{'\n'}
+                    {t('forgot.sentTo')}{'\n'}
                     <Text color={colors.text.primary} weight="semi">{email}</Text>
                   </Text>
                   <GradientButton
-                    label="Back to Sign In"
+                    label={t('forgot.backToSignIn')}
                     testID="forgot-back-btn"
                     onPress={() => router.replace('/auth/login')}
                   />
@@ -111,7 +113,7 @@ export default function ForgotScreen() {
               >
                 <Ionicons name="arrow-back" size={14} color={colors.brand.secondary} />
                 <Text variant="bodySm" color={colors.brand.secondary} weight="semi">
-                  Back to Sign In
+                  {t('forgot.backToSignIn')}
                 </Text>
               </Pressable>
             </View>

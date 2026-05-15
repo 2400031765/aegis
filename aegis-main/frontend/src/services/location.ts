@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { LocationEventEmitter } from 'expo-location/build/LocationEventEmitter';
 import { Platform } from 'react-native';
 
 export interface AegisLocation {
@@ -20,6 +21,33 @@ const toAegis = (loc: Location.LocationObject): AegisLocation => ({
   speed: loc.coords.speed,
   timestamp: loc.timestamp,
 });
+
+type RemovableSubscription = { remove?: () => void };
+type ExpoLocationEmitterWithLegacyCleanup = typeof LocationEventEmitter & {
+  removeSubscription?: (subscription: RemovableSubscription | null | undefined) => void;
+};
+
+let locationEmitterPatched = false;
+
+const ensureLocationEmitterCleanupPatch = () => {
+  if (locationEmitterPatched) return;
+  locationEmitterPatched = true;
+
+  const emitter = LocationEventEmitter as ExpoLocationEmitterWithLegacyCleanup;
+  if (typeof emitter.removeSubscription !== 'function') {
+    emitter.removeSubscription = (subscription) => {
+      subscription?.remove?.();
+    };
+  }
+};
+
+const removeLocationSubscription = (subscription: Location.LocationSubscription | null) => {
+  try {
+    subscription?.remove();
+  } catch {
+    // Cleanup must never crash emergency exit. Expo may already have removed it.
+  }
+};
 
 export const locationService = {
   async ensurePermission(): Promise<{ granted: boolean; canAskAgain: boolean }> {
@@ -47,6 +75,8 @@ export const locationService = {
    * Subscribe to live updates. Returns an unsubscribe function.
    */
   watch(onUpdate: (loc: AegisLocation) => void, intervalMs = 5000): () => void {
+    ensureLocationEmitterCleanupPatch();
+
     let cancelled = false;
     let sub: Location.LocationSubscription | null = null;
 
@@ -61,15 +91,16 @@ export const locationService = {
       },
     ).then((s) => {
       if (cancelled) {
-        s.remove();
+        removeLocationSubscription(s);
       } else {
         sub = s;
       }
-    });
+    }).catch(() => undefined);
 
     return () => {
       cancelled = true;
-      sub?.remove();
+      removeLocationSubscription(sub);
+      sub = null;
     };
   },
 };

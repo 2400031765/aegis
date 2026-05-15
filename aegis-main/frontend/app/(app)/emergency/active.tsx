@@ -14,6 +14,7 @@ import { useContactsStore } from '../../../src/store/contactsStore';
 import { useAuthStore } from '../../../src/store/authStore';
 import { locationService, formatCoord, formatAccuracy } from '../../../src/services/location';
 import { colors, spacing, radii } from '../../../src/theme';
+import { useTranslation } from '../../../src/hooks/useTranslation';
 
 const StatusDot = ({ active }: { active?: boolean }) => {
   const o = React.useRef(new Animated.Value(0)).current;
@@ -43,6 +44,7 @@ const StatusDot = ({ active }: { active?: boolean }) => {
 
 export default function ActiveEmergencyScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const phase = useEmergencyStore((s) => s.phase);
   const durationMs = useEmergencyStore((s) => s.durationMs);
   const tickDuration = useEmergencyStore((s) => s.tickDuration);
@@ -80,11 +82,11 @@ export default function ActiveEmergencyScreen() {
     }
   }, [phase, router]);
 
-  const onStop = () => {
+  const onStop = async () => {
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     }
-    stopAlert();
+    await stopAlert();
     router.replace('/(app)/dashboard');
   };
 
@@ -111,28 +113,28 @@ export default function ActiveEmergencyScreen() {
           <View style={styles.statusBanner}>
             <StatusDot active />
             <Text variant="label" color="#FF2079" style={{ letterSpacing: 3 }}>
-              EMERGENCY MODE ACTIVE
+              {t('emergency.activeBanner')}
             </Text>
           </View>
 
           <Text variant="h2" weight="bold" style={styles.title}>
-            You are{'\n'}
-            <Text variant="h2" weight="bold" color="#FF2079">protected.</Text>
+            {t('emergency.activeTitle')}{'\n'}
+            <Text variant="h2" weight="bold" color="#FF2079">{t('emergency.activeAccent')}</Text>
           </Text>
           <Text variant="bodyBase" color="#E2C4D2" style={styles.subtitle}>
-            AEGIS is recording, tracking your location, and ready to alert your trusted circle.
+            {t('emergency.activeSubtitle')}
           </Text>
 
           {/* Live timer */}
           <View style={styles.timerCard}>
-            <Text variant="label" color="#FFB0C8" style={{ letterSpacing: 2 }}>ACTIVE FOR</Text>
+            <Text variant="label" color="#FFB0C8" style={{ letterSpacing: 2 }}>{t('emergency.activeFor')}</Text>
             <Text style={styles.timerText}>{elapsed}</Text>
 
             {/* Recording waveform */}
             <View style={styles.recRow}>
               <View style={styles.recDot} />
               <Text variant="label" color="#FFB0C8" style={{ letterSpacing: 2 }}>
-                REC · AUDIO CAPTURE PRIMED
+                Recording emergency evidence...
               </Text>
             </View>
             <Waveform active={isRecording} bars={32} color="#FF2079" height={48} />
@@ -145,13 +147,13 @@ export default function ActiveEmergencyScreen() {
                 <Ionicons name="navigate" size={18} color="#fff" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text variant="bodyBase" weight="bold">Live Location</Text>
+                <Text variant="bodyBase" weight="bold">{t('emergency.liveLocation')}</Text>
                 <Text variant="bodySm" color="#E2C4D2">
                   {permission === 'granted'
-                    ? 'GPS streaming · Updates every 5s'
+                    ? t('emergency.gpsStreaming')
                     : permission === 'denied'
-                    ? 'Permission denied — tap to retry'
-                    : 'Requesting GPS access…'}
+                      ? t('emergency.gpsDenied')
+                      : t('emergency.gpsRequesting')}
                 </Text>
               </View>
               <Pressable
@@ -187,25 +189,25 @@ export default function ActiveEmergencyScreen() {
                 </View>
               </View>
               <Text variant="label" color="#FFB0C8" style={styles.mapBadge}>
-                LIVE
+                {t('emergency.live')}
               </Text>
             </View>
 
             <View style={styles.coordsRow}>
               <View style={styles.coordCol}>
-                <Text variant="label" color="#FFB0C8">LATITUDE</Text>
+                <Text variant="label" color="#FFB0C8">{t('emergency.latitude')}</Text>
                 <Text variant="bodyBase" weight="semi">
                   {location ? formatCoord(location.latitude) : '—'}
                 </Text>
               </View>
               <View style={styles.coordCol}>
-                <Text variant="label" color="#FFB0C8">LONGITUDE</Text>
+                <Text variant="label" color="#FFB0C8">{t('emergency.longitude')}</Text>
                 <Text variant="bodyBase" weight="semi">
                   {location ? formatCoord(location.longitude) : '—'}
                 </Text>
               </View>
               <View style={styles.coordCol}>
-                <Text variant="label" color="#FFB0C8">ACCURACY</Text>
+                <Text variant="label" color="#FFB0C8">{t('emergency.accuracy')}</Text>
                 <Text variant="bodyBase" weight="semi">
                   {location ? formatAccuracy(location.accuracy) : '—'}
                 </Text>
@@ -217,7 +219,7 @@ export default function ActiveEmergencyScreen() {
           <View style={styles.contactsCard}>
             <View style={styles.contactsHeader}>
               <Ionicons name="people" size={18} color="#FF2079" />
-              <Text variant="bodyBase" weight="bold">Trusted Circle</Text>
+              <Text variant="bodyBase" weight="bold">{t('emergency.trustedCircle')}</Text>
               <View style={styles.contactsBadge}>
                 <Text variant="label" color="#fff">
                   {selectedContacts.length}
@@ -226,7 +228,7 @@ export default function ActiveEmergencyScreen() {
             </View>
             {selectedContacts.length === 0 ? (
               <Text variant="bodySm" color="#E2C4D2" style={{ marginTop: spacing.sm }}>
-                No trusted contacts yet. Add some from the dashboard so AEGIS can alert them.
+                {t('emergency.noContacts')}
               </Text>
             ) : (
               <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
@@ -242,7 +244,7 @@ export default function ActiveEmergencyScreen() {
                       <Text variant="label" color="#FFB0C8">{c.phone}</Text>
                     </View>
                     <View style={styles.statusPill}>
-                      <Text variant="label" color="#fff">QUEUED</Text>
+                      <Text variant="label" color="#fff">{t('emergency.queued')}</Text>
                     </View>
                   </View>
                 ))}
@@ -255,9 +257,9 @@ export default function ActiveEmergencyScreen() {
             <View style={styles.sentCard}>
               <Ionicons name="checkmark-circle" size={28} color="#39FFA0" />
               <View style={{ flex: 1 }}>
-                <Text variant="bodyBase" weight="bold">Alert payload prepared</Text>
+                <Text variant="bodyBase" weight="bold">{t('emergency.alertPrepared')}</Text>
                 <Text variant="bodySm" color="#E2C4D2">
-                  Live SMS / FCM dispatch ships in Module 5. Payload ready for {selectedContacts.length} contact{selectedContacts.length === 1 ? '' : 's'} as {user?.displayName ?? 'you'}.
+                  {t('emergency.alertPreparedDesc', { count: selectedContacts.length, name: user?.displayName ?? 'you' })}
                 </Text>
               </View>
             </View>
@@ -266,7 +268,7 @@ export default function ActiveEmergencyScreen() {
           {/* CTAs */}
           <View style={styles.ctaCol}>
             <GradientButton
-              label="Send Emergency Alert"
+              label={t('emergency.sendAlert')}
               testID="emergency-send-btn"
               onPress={onSend}
               colors={['#FF2079', '#B800E6', '#7000FF']}
@@ -278,7 +280,7 @@ export default function ActiveEmergencyScreen() {
               style={styles.stopBtn}
             >
               <Ionicons name="stop-circle" size={22} color="#fff" />
-              <Text variant="bodyLg" weight="bold" color="#fff">Stop Alert</Text>
+              <Text variant="bodyLg" weight="bold" color="#fff">{t('emergency.stopAlert')}</Text>
             </Pressable>
           </View>
         </ScrollView>

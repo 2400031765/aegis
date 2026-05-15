@@ -45,7 +45,6 @@ export const Waveform = ({
     animations.forEach((a) => a.start());
     return () => animations.forEach((a) => a.stop());
   }, [active, anims]);
-
   return (
     <View style={[styles.row, { height }]}>
       {anims.map((a, i) => (
@@ -56,7 +55,7 @@ export const Waveform = ({
             {
               backgroundColor: color,
               height: a.interpolate({ inputRange: [0, 1], outputRange: [4, height] }),
-              opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
+              opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }),
             },
           ]}
         />

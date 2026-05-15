@@ -197,3 +197,89 @@ async def safe_places(req: SafePlacesRequest) -> SafePlacesResponse:
 @router.get("/health")
 async def ai_health() -> dict[str, str]:
     return {"status": "ok", "module": "ai-distress-intelligence"}
+
+
+# ─── Gemma proxy endpoint ─────────────────────────────────────────────────────
+# Frontend calls this instead of HF directly — avoids CORS, keeps token server-side.
+
+class GemmaProxyRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    history: list[ChatMessage] = Field(default_factory=list)
+    location: LocationDTO | None = None
+
+
+class GemmaProxyResponse(BaseModel):
+    reply: str
+    risk: str
+    actions: list[str] = []
+    reassurance: str | None = None
+    breathing: str | None = None
+    guidance: str | None = None
+    safeword: bool = False
+    safeword_phrase: str | None = None
+    stealth_activate: bool = False
+    nearby_places: list[SafePlaceDTO] = []
+    recommended_place: SafePlaceDTO | None = None
+    source: str = "gemma"
+
+
+@router.post("/gemma", response_model=GemmaProxyResponse)
+async def gemma_proxy(req: GemmaProxyRequest) -> GemmaProxyResponse:
+    """
+    Proxy endpoint: frontend → backend → HF Inference API.
+    Keeps the HF token server-side, eliminates CORS issues.
+    Falls back to the standard AI service if Gemma fails.
+    """
+    history = [m.model_dump() for m in req.history]
+    context = {
+        "location": req.location.model_dump() if req.location else None,
+        "nearby_places": [],
+    }
+
+    # Try HF Gemma first via the provider chain
+    try:
+        from services.providers.hf_gemma import hf_gemma_from_env
+        hf = hf_gemma_from_env()
+        if not hf:
+            raise RuntimeError("HF_TOKEN not configured")
+
+        import uuid
+        result = await hf.generate(
+            session_id=str(uuid.uuid4()),
+            user_text=req.message,
+            history=history,
+            context=context,
+        )
+        logger.info("[Gemma Proxy] Gemma response success — risk=%s", result.risk)
+        return GemmaProxyResponse(
+            reply=result.reply,
+            risk=result.risk,
+            actions=list(result.actions),
+            reassurance=result.reassurance,
+            breathing=result.breathing,
+            guidance=result.guidance,
+            source="gemma",
+        )
+    except Exception as exc:
+        logger.warning("[Gemma Proxy] Gemma failed, using fallback AI — %s", exc)
+
+    # Fallback: use the standard classify_and_respond (Gemini or rule-based)
+    try:
+        result = await classify_and_respond(
+            session_id="gemma-fallback",
+            user_text=req.message,
+            history=history,
+            context=context,
+        )
+        return GemmaProxyResponse(
+            reply=result.reply,
+            risk=result.risk,
+            actions=list(result.actions),
+            reassurance=result.reassurance,
+            breathing=result.breathing,
+            guidance=result.guidance,
+            source="fallback",
+        )
+    except Exception as exc:
+        logger.exception("[Gemma Proxy] All AI providers failed: %s", exc)
+        raise HTTPException(status_code=500, detail="AI temporarily unavailable.")

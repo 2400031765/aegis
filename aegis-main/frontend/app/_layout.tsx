@@ -5,6 +5,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAegisFonts } from '../src/hooks/useAegisFonts';
 import { useAuthStore } from '../src/store/authStore';
 import { useContactsStore } from '../src/store/contactsStore';
+import { useEmergencyStore } from '../src/store/emergencyStore';
 import { colors } from '../src/theme';
 
 export default function RootLayout() {
@@ -12,11 +13,13 @@ export default function RootLayout() {
   const hydrate = useAuthStore((s) => s.hydrate);
   const hydrated = useAuthStore((s) => s.hydrated);
   const hydrateContacts = useContactsStore((s) => s.hydrate);
+  const hydrateRecording = useEmergencyStore((s) => s.hydrateRecording);
 
   useEffect(() => {
     hydrate();
     hydrateContacts();
-  }, [hydrate, hydrateContacts]);
+    hydrateRecording();
+  }, [hydrate, hydrateContacts, hydrateRecording]);
 
   if (!fontsLoaded || !hydrated) {
     return (

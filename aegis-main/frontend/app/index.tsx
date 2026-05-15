@@ -10,6 +10,7 @@ import { BlendedLogo } from '../src/components/BlendedLogo';
 import { GradientButton } from '../src/components/GradientButton';
 import { Text } from '../src/components/Text';
 import { colors, spacing, radii } from '../src/theme';
+import { useTranslation } from '../src/hooks/useTranslation';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -18,17 +19,18 @@ interface Feature {
   label: string;
 }
 
-const FEATURES: Feature[] = [
-  { icon: 'body', label: 'Smart Emergency\nResponse' },
-  { icon: 'scan-circle', label: 'AI-Powered\nThreat Detection' },
-  { icon: 'walk', label: 'SafeWalk\nCompanion' },
-  { icon: 'location', label: 'Real-time\nLocation Sharing' },
-];
-
 const useFade = (initial = 0) => useRef(new Animated.Value(initial)).current;
 
 export default function SplashScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
+
+  const features: Feature[] = [
+    { icon: 'body', label: t('splash.features.sos') },
+    { icon: 'scan-circle', label: t('splash.features.threat') },
+    { icon: 'walk', label: t('splash.features.walk') },
+    { icon: 'location', label: t('splash.features.location') },
+  ];
 
   // Animation refs
   const headerOpacity = useFade();
@@ -110,7 +112,7 @@ export default function SplashScreen() {
 
             <View style={styles.headerText}>
               <Text variant="label" color={colors.brand.secondary} style={styles.welcomeLabel}>
-                Welcome to
+                {t('splash.welcomeTo')}
               </Text>
               <Text style={styles.aegisWordmark}>AEGIS</Text>
             </View>
@@ -120,7 +122,7 @@ export default function SplashScreen() {
           <Animated.View style={{ opacity: taglineOpacity, marginTop: spacing.lg }}>
             <Text style={styles.brackets}>
               <Text style={styles.bracket}>[ </Text>
-              <Text style={styles.tagline}>ADAPTIVE EMERGENCY GUIDANCE AND INTELLIGENCE SECURITY</Text>
+              <Text style={styles.tagline}>{t('splash.tagline')}</Text>
               <Text style={styles.bracket}> ]</Text>
             </Text>
           </Animated.View>
@@ -130,13 +132,13 @@ export default function SplashScreen() {
 
           {/* For the safety of women around the world */}
           <Animated.View style={{ opacity: safetyOpacity, marginTop: spacing.lg }}>
-            <Text style={styles.safetyLine}>FOR THE SAFETY OF WOMEN AROUND THE WORLD</Text>
+            <Text style={styles.safetyLine}>{t('splash.forSafety')}</Text>
           </Animated.View>
 
           {/* AI description */}
           <Animated.View style={{ opacity: descOpacity, marginTop: spacing.xl }}>
             <Text style={styles.aiDesc}>
-              AEGIS is an AI-powered safety companion designed to protect, guide and empower women in every situation.
+              {t('splash.aiDesc')}
             </Text>
           </Animated.View>
 
@@ -144,7 +146,7 @@ export default function SplashScreen() {
           <Animated.View
             style={[styles.features, { opacity: featuresOpacity, transform: [{ translateY: featuresY }] }]}
           >
-            {FEATURES.map((f, i) => (
+            {features.map((f, i) => (
               <View key={i} style={styles.featureCol}>
                 <View style={styles.iconTile}>
                   <Ionicons name={f.icon} size={28} color={colors.brand.secondary} />
@@ -156,7 +158,7 @@ export default function SplashScreen() {
 
           {/* You are not alone */}
           <Animated.View style={{ opacity: youOpacity, marginTop: spacing.xl }}>
-            <Text style={styles.youLine}>YOU ARE NOT ALONE. AEGIS IS WITH YOU.</Text>
+            <Text style={styles.youLine}>{t('splash.youAreNotAlone')}</Text>
           </Animated.View>
 
           {/* CTA */}
@@ -164,13 +166,13 @@ export default function SplashScreen() {
             style={[styles.ctaWrap, { opacity: ctaOpacity, transform: [{ translateY: ctaY }] }]}
           >
             <GradientButton
-              label="GET STARTED"
+              label={t('splash.getStarted')}
               testID="splash-get-started-btn"
               height={68}
               colors={['#FF2079', '#B800E6', '#7000FF', '#4B2DFF']}
               onPress={() => router.push('/language')}
             />
-            <Text style={styles.footer}>By continuing you agree to our Privacy & Safety Pledge</Text>
+            <Text style={styles.footer}>{t('splash.privacy')}</Text>
           </Animated.View>
         </ScrollView>
       </SafeAreaView>

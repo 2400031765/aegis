@@ -13,16 +13,19 @@ import { colors, spacing, radii } from '../src/theme';
 import { PRIMARY_LANGUAGES, ADDITIONAL_LANGUAGES, type Language } from '../src/i18n/languages';
 import { useAuthStore } from '../src/store/authStore';
 import { getDeviceLocale } from '../src/i18n';
+import { useTranslation } from '../src/hooks/useTranslation';
 
 const Row = ({
   lang,
   selected,
   detected,
+  autoLabel,
   onSelect,
 }: {
   lang: Language;
   selected: boolean;
   detected: boolean;
+  autoLabel: string;
   onSelect: () => void;
 }) => (
   <Pressable testID={`lang-option-${lang.code}`} onPress={onSelect}>
@@ -42,7 +45,7 @@ const Row = ({
             {detected ? (
               <View style={styles.detectedPill}>
                 <Text variant="label" color="#fff" style={{ letterSpacing: 1 }}>
-                  Auto
+                  {autoLabel}
                 </Text>
               </View>
             ) : null}
@@ -71,6 +74,7 @@ const Row = ({
 
 export default function LanguageScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const language = useAuthStore((s) => s.language);
   const setLanguage = useAuthStore((s) => s.setLanguage);
   const [selected, setSelected] = useState<string>(language || getDeviceLocale() || 'en');
@@ -123,16 +127,16 @@ export default function LanguageScreen() {
           </View>
 
           <Text variant="label" color={colors.brand.secondary} style={styles.eyebrow}>
-            Step 1 of 3
+            {t('language.eyebrow')}
           </Text>
           <Text variant="h2" weight="bold" style={styles.title}>
-            Choose your{'\n'}
+            {t('language.title')}{'\n'}
             <Text variant="h2" weight="bold" color={colors.brand.secondary}>
-              language.
+              {t('language.titleAccent')}
             </Text>
           </Text>
           <Text variant="bodyBase" color={colors.text.secondary} style={styles.subtitle}>
-            AEGIS speaks your language during emergencies. You can change this anytime.
+            {t('language.subtitle')}
           </Text>
         </Animated.View>
 
@@ -147,6 +151,7 @@ export default function LanguageScreen() {
               lang={lang}
               selected={selected === lang.code}
               detected={detectedCode === lang.code}
+              autoLabel={t('common.auto')}
               onSelect={() => setSelected(lang.code)}
             />
           ))}
@@ -162,26 +167,27 @@ export default function LanguageScreen() {
               color={colors.brand.secondary}
             />
             <Text variant="label" color={colors.brand.secondary}>
-              {showMore ? 'Show fewer' : 'More languages'}
+              {showMore ? t('common.seeLess') : t('common.seeMore')}
             </Text>
           </Pressable>
 
           {showMore
             ? ADDITIONAL_LANGUAGES.map((lang) => (
-                <Row
-                  key={lang.code}
-                  lang={lang}
-                  selected={selected === lang.code}
-                  detected={detectedCode === lang.code}
-                  onSelect={() => setSelected(lang.code)}
-                />
-              ))
+              <Row
+                key={lang.code}
+                lang={lang}
+                selected={selected === lang.code}
+                detected={detectedCode === lang.code}
+                autoLabel={t('common.auto')}
+                onSelect={() => setSelected(lang.code)}
+              />
+            ))
             : null}
         </Animated.ScrollView>
 
         <View style={styles.ctaWrap}>
           <GradientButton
-            label="Continue"
+            label={t('common.continue')}
             testID="lang-continue-btn"
             onPress={handleContinue}
           />

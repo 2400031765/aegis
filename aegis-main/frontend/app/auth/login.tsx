@@ -23,12 +23,13 @@ import { colors, spacing, radii } from '../../src/theme';
 import { useAuthStore } from '../../src/store/authStore';
 import { validators } from '../../src/services/auth';
 import { isFirebaseConfigured } from '../../src/services/firebase';
+import { useTranslation } from '../../src/hooks/useTranslation';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const signIn = useAuthStore((s) => s.signIn);
   const signInAsGuest = useAuthStore((s) => s.signInAsGuest);
-  const signInWithGoogle = useAuthStore((s) => s.signInWithGoogle);
   const loading = useAuthStore((s) => s.loading);
 
   const [email, setEmail] = useState('');
@@ -47,54 +48,53 @@ export default function LoginScreen() {
 
   const validate = () => {
     const next: typeof errors = {};
-    if (!validators.email(email)) next.email = 'Please enter a valid email address.';
-    if (!validators.password(password)) next.password = 'Password must be at least 6 characters.';
+    if (!validators.email(email)) next.email = t('auth.invalidEmail');
+    if (!validators.password(password)) next.password = t('auth.weakPassword');
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
   const onLogin = async () => {
-  if (!validate()) return;
+    if (!validate()) return;
 
-  try {
-    setErrors({});
+    try {
+      setErrors({});
 
-    console.log("START LOGIN");
+      console.log("START LOGIN");
 
-    await signIn(email.trim(), password);
+      await signIn(email.trim(), password);
 
-    console.log("LOGIN SUCCESS");
+      console.log("LOGIN SUCCESS");
 
-    router.replace('/(app)/dashboard');
+      router.replace('/(app)/dashboard');
 
-  } catch (e: unknown) {
-    console.log("LOGIN ERROR:", e);
+    } catch (e: unknown) {
+      console.log("LOGIN ERROR:", e);
 
-    const msg =
-      e instanceof Error ? e.message : 'Login failed.';
+      const msg = e instanceof Error ? e.message : t('auth.loginFailed');
 
-    setErrors({ form: msg });
-  }
-};
+      setErrors({ form: msg });
+    }
+  };
 
   const onGuest = async () => {
     try {
       await signInAsGuest();
       router.replace('/(app)/dashboard');
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Guest sign-in failed.';
+      const msg = e instanceof Error ? e.message : t('auth.guestFailed');
       setErrors({ form: msg });
     }
   };
 
   const onGoogle = async () => {
-  try {
-    alert("Google login coming soon");
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Google sign-in failed.';
-    setErrors({ form: msg });
-  }
-};
+    try {
+      alert(t('auth.googleComingSoon'));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : t('auth.googleFailed');
+      setErrors({ form: msg });
+    }
+  };
 
   return (
     <AmbientBackground>
@@ -111,13 +111,13 @@ export default function LoginScreen() {
             <Animated.View
               style={{ opacity: fadeIn, transform: [{ translateY: slideUp }] }}
             >
-              <AuthHeader title="Welcome Back" subtitle="Stay safe. Stay fearless." showBack={false} />
+              <AuthHeader title={t('auth.welcomeBack')} subtitle={t('auth.welcomeBackSub')} showBack={false} />
 
               {!isFirebaseConfigured ? (
                 <View style={styles.demoBanner}>
                   <Ionicons name="information-circle" size={16} color={colors.brand.secondary} />
                   <Text variant="bodySm" color={colors.text.secondary} style={{ flex: 1 }}>
-                    Demo mode — Firebase not configured. Authentication is local-only.
+                    {t('auth.demoBanner')}
                   </Text>
                 </View>
               ) : null}
@@ -125,9 +125,9 @@ export default function LoginScreen() {
               <View style={styles.form}>
                 <FormField
                   testID="login-email"
-                  label="Email"
+                  label={t('auth.email')}
                   icon="mail-outline"
-                  placeholder="you@example.com"
+                  placeholder={t('auth.emailPlaceholder')}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   value={email}
@@ -136,9 +136,9 @@ export default function LoginScreen() {
                 />
                 <FormField
                   testID="login-password"
-                  label="Password"
+                  label={t('auth.password')}
                   icon="lock-closed-outline"
-                  placeholder="At least 6 characters"
+                  placeholder={t('auth.passwordPlaceholder')}
                   isPassword
                   value={password}
                   onChangeText={setPassword}
@@ -152,7 +152,7 @@ export default function LoginScreen() {
                   hitSlop={8}
                 >
                   <Text variant="bodySm" color={colors.brand.secondary} weight="semi">
-                    Forgot password?
+                    {t('auth.forgot')}
                   </Text>
                 </Pressable>
 
@@ -163,7 +163,7 @@ export default function LoginScreen() {
                 ) : null}
 
                 <GradientButton
-                  label={loading ? 'Signing in…' : 'Log In'}
+                  label={loading ? t('auth.signingIn') : t('auth.login')}
                   testID="login-submit-btn"
                   onPress={onLogin}
                   disabled={loading}
@@ -174,7 +174,7 @@ export default function LoginScreen() {
                 <View style={styles.divider}>
                   <View style={styles.dividerLine} />
                   <Text variant="bodySm" color={colors.text.tertiary}>
-                    or continue with
+                    {t('auth.divider')}
                   </Text>
                   <View style={styles.dividerLine} />
                 </View>
@@ -186,7 +186,7 @@ export default function LoginScreen() {
                     style={styles.socialBtn}
                   >
                     <Ionicons name="logo-google" size={20} color="#FFFFFF" />
-                    <Text variant="bodyBase" weight="semi">Google</Text>
+                    <Text variant="bodyBase" weight="semi">{t('auth.google')}</Text>
                   </Pressable>
                   <Pressable
                     testID="login-guest-btn"
@@ -194,13 +194,13 @@ export default function LoginScreen() {
                     style={styles.socialBtn}
                   >
                     <Ionicons name="person-outline" size={20} color="#FFFFFF" />
-                    <Text variant="bodyBase" weight="semi">Guest</Text>
+                    <Text variant="bodyBase" weight="semi">{t('auth.guest')}</Text>
                   </Pressable>
                 </View>
 
                 <View style={styles.footerRow}>
                   <Text variant="bodySm" color={colors.text.secondary}>
-                    Don&apos;t have an account?
+                    {t('auth.noAccount')}
                   </Text>
                   <Pressable
                     testID="login-go-signup"
@@ -208,7 +208,7 @@ export default function LoginScreen() {
                     hitSlop={8}
                   >
                     <Text variant="bodySm" color={colors.brand.secondary} weight="bold">
-                      Sign Up
+                      {t('auth.signupCta')}
                     </Text>
                   </Pressable>
                 </View>

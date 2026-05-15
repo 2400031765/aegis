@@ -17,8 +17,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Literal, Optional, Protocol
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
-
 logger = logging.getLogger(__name__)
 
 Risk = Literal["low", "medium", "high"]
@@ -128,17 +126,6 @@ class GeminiProvider:
         self.model = model
 
     async def generate(self, session_id: str, user_text: str, history: Iterable[dict[str, str]], context: Optional[dict[str, Any]] = None) -> AIReply:
-        # `LlmChat` is single-turn per call; history is conveyed via a compact
-        # transcript appended to the user message so we keep things simple.
-        chat = (
-            LlmChat(
-                api_key=self.api_key,
-                session_id=session_id,
-                system_message=AEGIS_SYSTEM_PROMPT,
-            )
-            .with_model("gemini", self.model)
-        )
-
         history_block = ""
         hist = list(history)[-6:]
         if hist:
@@ -174,7 +161,36 @@ class GeminiProvider:
         )
 
         try:
-            raw = await chat.send_message(UserMessage(text=prompt))
+            import httpx
+
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent",
+                    params={"key": self.api_key},
+                    json={
+                        "contents": [
+                            {
+                                "role": "user",
+                                "parts": [{"text": f"{AEGIS_SYSTEM_PROMPT}\n\n{prompt}"}],
+                            }
+                        ],
+                        "generationConfig": {
+                            "temperature": 0.35,
+                            "maxOutputTokens": 450,
+                            "responseMimeType": "application/json",
+                        },
+                    },
+                )
+            if resp.status_code != 200:
+                logger.warning("Gemini API error %s: %s", resp.status_code, resp.text[:300])
+                return _fallback(user_text, raw=resp.text[:500])
+            payload = resp.json()
+            raw = (
+                payload.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [{}])[0]
+                .get("text", "")
+            )
         except Exception as exc:  # pragma: no cover - network failure
             logger.exception("Gemini generation failed: %s", exc)
             return _fallback(user_text, raw=str(exc))
@@ -261,19 +277,35 @@ def get_ai_provider() -> AIProvider:
     global _provider
     if _provider is not None:
         return _provider
+
+    # ── Priority 1: HF Gemma (HF_TOKEN set in backend .env) ──────────────────
+    try:
+        from services.providers.hf_gemma import hf_gemma_from_env
+        hf = hf_gemma_from_env()
+        if hf:
+            logger.info("[AI Service] Using Gemma — HF Inference API (google/gemma-2-2b-it)")
+            _provider = hf
+            return _provider
+    except Exception as exc:
+        logger.warning("[AI Service] HF Gemma provider unavailable: %s", exc)
+
+    # ── Priority 2: Gemini (AEGIS_LLM_KEY set) ────────────────────────────────
     legacy_key_name = "EM" + "ERGENT_LLM_KEY"
     api_key = os.environ.get("AEGIS_LLM_KEY") or os.environ.get(legacy_key_name) or ""
     model = os.environ.get("AEGIS_AI_MODEL", "gemini-2.0-flash")
-    if not api_key:
-        logger.warning("LLM key not set — AI will use local rule-based fallback only.")
-
-        class _Stub:
-            async def generate(self, session_id: str, user_text: str, history: Iterable[dict[str, str]], context: Optional[dict[str, Any]] = None) -> AIReply:
-                return _fallback(user_text)
-
-        _provider = _Stub()
+    if api_key:
+        logger.info("[AI Service] Using Gemini — model=%s", model)
+        _provider = GeminiProvider(api_key=api_key, model=model)
         return _provider
-    _provider = GeminiProvider(api_key=api_key, model=model)
+
+    # ── Priority 3: Local rule-based fallback ─────────────────────────────────
+    logger.warning("[AI Service] No AI provider configured — using local rule-based fallback only.")
+
+    class _Stub:
+        async def generate(self, session_id: str, user_text: str, history: Iterable[dict[str, str]], context: Optional[dict[str, Any]] = None) -> AIReply:
+            return _fallback(user_text)
+
+    _provider = _Stub()
     return _provider
 
 
