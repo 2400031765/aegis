@@ -118,8 +118,6 @@ def _coerce_json(text: str) -> dict[str, Any] | None:
                 return None
     return None
 
-
-# -------- Gemini provider (current default) ----------------------------------
 class GeminiProvider:
     def __init__(self, api_key: str, model: str = "gemini-2.0-flash"):
         self.api_key = api_key
