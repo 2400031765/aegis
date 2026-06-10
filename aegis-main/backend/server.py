@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, Query
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -50,8 +50,10 @@ async def create_status_check(input: StatusCheckCreate):
     return status_obj
 
 @api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
+async def get_status_checks(client_name: str | None = Query(None, description="Filter status checks by client name")):
+    if not client_name:
+        return []
+    status_checks = await db.status_checks.find({"client_name": client_name}).to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
 # Include the router in the main app

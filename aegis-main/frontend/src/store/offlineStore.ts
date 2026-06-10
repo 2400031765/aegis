@@ -7,13 +7,14 @@
  *  - isOnline / setOnline  — driven by useNetworkStatus hook in the UI layer
  *  - queueAction           — called by chatStore when an emergency action fires offline
  *  - flushQueue            — called when connectivity is restored; returns queued items
- *  - Persisted via AsyncStorage under 'aegis.offline_queue'
+ *  - Persisted per-user via AsyncStorage under 'aegis.user.<uid>.offline_queue'
  */
 
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthSnapshot, useAuthStore } from './authStore';
+import { loadUserStorageJson, saveUserStorageJson, removeUserStorageKey } from '../services/userStorage';
 
-const QUEUE_KEY = 'aegis.offline_queue';
+const STORAGE_KEY = 'offline_queue';
 
 export interface QueuedAction {
   id: string;
@@ -38,8 +39,8 @@ interface Actions {
 
 const newId = () => 'qa-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
-const persist = (actions: QueuedAction[]) =>
-  AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(actions));
+const persist = (actions: QueuedAction[], userId: string | null) =>
+  saveUserStorageJson(userId, STORAGE_KEY, actions);
 
 export const useOfflineStore = create<State & Actions>((set, get) => ({
   isOnline: true,
@@ -49,16 +50,24 @@ export const useOfflineStore = create<State & Actions>((set, get) => ({
   setOnline: (online) => set({ isOnline: online }),
 
   hydrate: async () => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (!userId) {
+      set({ queuedActions: [], hydrated: true });
+      return;
+    }
+
     try {
-      const raw = await AsyncStorage.getItem(QUEUE_KEY);
-      const queuedActions: QueuedAction[] = raw ? JSON.parse(raw) : [];
+      const queuedActions: QueuedAction[] = await loadUserStorageJson(userId, STORAGE_KEY, []);
       set({ queuedActions, hydrated: true });
     } catch {
-      set({ hydrated: true });
+      set({ queuedActions: [], hydrated: true });
     }
   },
 
   queueAction: async (action) => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (!userId) return;
+
     const item: QueuedAction = {
       ...action,
       id: newId(),
@@ -66,20 +75,31 @@ export const useOfflineStore = create<State & Actions>((set, get) => ({
     };
     const next = [...get().queuedActions, item];
     set({ queuedActions: next });
-    await persist(next);
+    await persist(next, userId);
   },
 
   flushQueue: async () => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
     const items = get().queuedActions;
     if (items.length === 0) return [];
     // Clear the queue — caller is responsible for actually sending
     set({ queuedActions: [] });
-    await AsyncStorage.removeItem(QUEUE_KEY);
+    if (userId) await removeUserStorageKey(userId, STORAGE_KEY);
     return items;
   },
 
   clearQueue: async () => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
     set({ queuedActions: [] });
-    await AsyncStorage.removeItem(QUEUE_KEY);
+    if (userId) await removeUserStorageKey(userId, STORAGE_KEY);
   },
 }));
+
+useAuthStore.subscribe(
+  (state) => state.user?.uid,
+  (userId, prevUserId) => {
+    if (userId !== prevUserId) {
+      useOfflineStore.setState({ queuedActions: [], hydrated: false });
+    }
+  },
+);

@@ -3,6 +3,7 @@ import { aiService, type AIChatResponse, type Risk, type AIAction, type SafePlac
 import { locationService } from '../services/location';
 import { i18n } from '../i18n';
 import { useSafewordStore } from './safewordStore';
+import { useAuthStore } from './authStore';
 
 export interface ChatMsg {
   id: string;
@@ -185,3 +186,20 @@ export const useChatStore = create<State & Actions>((set, get) => ({
     return v;
   },
 }));
+
+useAuthStore.subscribe(
+  (state) => state.user?.uid,
+  (userId, prevUserId) => {
+    if (userId !== prevUserId) {
+      useChatStore.setState({
+        sessionId: newSession(),
+        messages: [getGreeting()],
+        thinking: false,
+        error: null,
+        lastResponse: null,
+        pendingStealth: false,
+        lastLocation: null,
+      });
+    }
+  },
+);

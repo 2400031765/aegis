@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthSnapshot, useAuthStore } from './authStore';
 import { requestAudioPermission, startRecording, stopRecording, playRecording, stopPlayback, type RecordingInfo } from '../services/audioService';
+import { loadUserStorageJson, saveUserStorageJson, removeUserStorageKey } from '../services/userStorage';
 
-const LAST_KEY = 'aegis.recording.last';
-const LIST_KEY = 'aegis.recordings.list';
+const LAST_KEY = 'recording.last';
+const LIST_KEY = 'recordings.list';
 
 interface State {
   isRecording: boolean;
@@ -82,12 +83,13 @@ export const useRecordingStore = create<State>((set, get) => ({
 
       const saved = await stopRecording();
       if (saved) {
-        // prepend to recordings list and persist
-        const listRaw = await AsyncStorage.getItem(LIST_KEY);
-        const list: RecordingInfo[] = listRaw ? JSON.parse(listRaw) : [];
+        const userId = saved.userId ?? getAuthSnapshot().user?.uid ?? null;
+        const list: RecordingInfo[] = userId ? await loadUserStorageJson(userId, LIST_KEY, []) : [];
         const newList = [saved, ...list].slice(0, 50);
-        await AsyncStorage.setItem(LIST_KEY, JSON.stringify(newList)).catch(() => undefined);
-        await AsyncStorage.setItem(LAST_KEY, JSON.stringify(saved)).catch(() => undefined);
+        if (userId) {
+          await saveUserStorageJson(userId, LIST_KEY, newList).catch(() => undefined);
+          await saveUserStorageJson(userId, LAST_KEY, saved).catch(() => undefined);
+        }
         set({ recordings: newList, recordingInfo: saved, isRecording: false, startedAt: null, durationMs: 0 });
         return saved;
       }
@@ -102,10 +104,14 @@ export const useRecordingStore = create<State>((set, get) => ({
 
   hydrate: async () => {
     try {
-      const rawLast = await AsyncStorage.getItem(LAST_KEY);
-      const rawList = await AsyncStorage.getItem(LIST_KEY);
-      const last: RecordingInfo | null = rawLast ? JSON.parse(rawLast) : null;
-      const list: RecordingInfo[] = rawList ? JSON.parse(rawList) : [];
+      const userId = getAuthSnapshot().user?.uid ?? null;
+      if (!userId) {
+        set({ recordingInfo: null, recordings: [] });
+        return;
+      }
+
+      const last: RecordingInfo | null = await loadUserStorageJson(userId, LAST_KEY, null);
+      const list: RecordingInfo[] = await loadUserStorageJson(userId, LIST_KEY, []);
       set({ recordingInfo: last, recordings: list });
     } catch (err) {
       console.error('[recordingStore] hydrate failed', err);
@@ -123,10 +129,22 @@ export const useRecordingStore = create<State>((set, get) => ({
   },
 
   clearHistory: async () => {
-    await AsyncStorage.removeItem(LIST_KEY).catch(() => undefined);
-    await AsyncStorage.removeItem(LAST_KEY).catch(() => undefined);
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (userId) {
+      await removeUserStorageKey(userId, LIST_KEY).catch(() => undefined);
+      await removeUserStorageKey(userId, LAST_KEY).catch(() => undefined);
+    }
     set({ recordings: [], recordingInfo: null });
   },
 }));
+
+useAuthStore.subscribe(
+  (state) => state.user?.uid,
+  (userId, prevUserId) => {
+    if (userId !== prevUserId) {
+      useRecordingStore.setState({ recordings: [], recordingInfo: null, isRecording: false, startedAt: null, durationMs: 0 });
+    }
+  },
+);
 
 export default useRecordingStore;

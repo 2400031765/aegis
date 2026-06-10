@@ -10,19 +10,20 @@ interface Props {
 export const AmbientBackground = ({ children }: Props) => {
   return (
     <View style={styles.root}>
-      <View style={styles.base} />
+      <View style={styles.base} pointerEvents="none" />
       <ImageBackground
         source={require('../../assets/images/bg-glow.png')}
-        style={StyleSheet.absoluteFillObject}
+        style={[StyleSheet.absoluteFillObject, styles.debugOverlay]}
         imageStyle={styles.glowImage}
         resizeMode="cover"
+        pointerEvents="none"
       />
       {/* Top vignette glow (purple) */}
       <LinearGradient
         colors={['rgba(112,0,255,0.35)', 'transparent']}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
-        style={styles.topGlow}
+        style={[styles.topGlow, styles.debugOverlay]}
         pointerEvents="none"
       />
       {/* Bottom magenta glow */}
@@ -30,7 +31,7 @@ export const AmbientBackground = ({ children }: Props) => {
         colors={['transparent', 'rgba(255,32,121,0.25)']}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
-        style={styles.bottomGlow}
+        style={[styles.bottomGlow, styles.debugOverlay]}
         pointerEvents="none"
       />
       {/* Dark overlay to keep content readable */}
@@ -73,5 +74,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     zIndex: 2,
+  },
+  debugOverlay: {
+    backgroundColor: 'rgba(255,0,0,0.2)',
   },
 });

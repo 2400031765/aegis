@@ -5,9 +5,14 @@
  */
 
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthSnapshot, useAuthStore } from './authStore';
+import {
+  loadUserStorageString,
+  saveUserStorageString,
+  removeUserStorageKey,
+} from '../services/userStorage';
 
-const KEY = 'aegis.safeword';
+const STORAGE_KEY = 'safeword';
 
 interface State {
   safeword: string;
@@ -27,22 +32,36 @@ export const useSafewordStore = create<State & Actions>((set, get) => ({
   hydrated: false,
 
   hydrate: async () => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (!userId) {
+      set({ safeword: '', hydrated: true });
+      return;
+    }
+
     try {
-      const raw = await AsyncStorage.getItem(KEY);
+      const raw = await loadUserStorageString(userId, STORAGE_KEY);
       set({ safeword: raw ?? '', hydrated: true });
     } catch {
-      set({ hydrated: true });
+      set({ safeword: '', hydrated: true });
     }
   },
 
   setSafeword: async (phrase: string) => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
     const trimmed = phrase.trim();
-    await AsyncStorage.setItem(KEY, trimmed);
+    if (!userId) {
+      set({ safeword: '' });
+      return;
+    }
+    await saveUserStorageString(userId, STORAGE_KEY, trimmed);
     set({ safeword: trimmed });
   },
 
   clearSafeword: async () => {
-    await AsyncStorage.removeItem(KEY);
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (userId) {
+      await removeUserStorageKey(userId, STORAGE_KEY);
+    }
     set({ safeword: '' });
   },
 
@@ -51,3 +70,12 @@ export const useSafewordStore = create<State & Actions>((set, get) => ({
     return safeword.length > 0 ? [safeword] : [];
   },
 }));
+
+useAuthStore.subscribe(
+  (state) => state.user?.uid,
+  (userId, prevUserId) => {
+    if (userId !== prevUserId) {
+      useSafewordStore.setState({ safeword: '', hydrated: false });
+    }
+  },
+);

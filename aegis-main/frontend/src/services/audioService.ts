@@ -14,6 +14,7 @@
 
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import { getAuthSnapshot } from '../store/authStore';
 
 // Dynamic import — expo-av may not be available in all environments
 let Audio: typeof import('expo-av').Audio | null = null;
@@ -30,6 +31,7 @@ export interface RecordingInfo {
   startedAt: number;
   durationMs: number;
   stoppedAt?: number;
+  userId?: string | null;
 }
 
 // Module-level recording instance — persists across component re-renders
@@ -37,16 +39,25 @@ let _recording: InstanceType<typeof import('expo-av').Audio.Recording> | null = 
 let _startedAt: number | null = null;
 let _filename: string | null = null;
 let _sound: InstanceType<typeof import('expo-av').Audio.Sound> | null = null;
+let _recordingUserId: string | null = null;
 
-const EVIDENCE_DIR = `${FileSystem.documentDirectory ?? ''}aegis-evidence/`;
+const BASE_EVIDENCE_DIR = `${FileSystem.documentDirectory ?? ''}aegis-evidence/`;
 
-async function ensureEvidenceDirectory() {
-  if (!FileSystem.documentDirectory) return null;
-  const dirInfo = await FileSystem.getInfoAsync(EVIDENCE_DIR);
+const buildEvidenceDirectory = (userId: string) => `${BASE_EVIDENCE_DIR}${userId}/`;
+const buildEvidenceFilename = () => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `aegis_emergency_${timestamp}_${suffix}.m4a`;
+};
+
+async function ensureEvidenceDirectory(userId: string | null) {
+  if (!FileSystem.documentDirectory || !userId) return null;
+  const dir = buildEvidenceDirectory(userId);
+  const dirInfo = await FileSystem.getInfoAsync(dir);
   if (!dirInfo.exists) {
-    await FileSystem.makeDirectoryAsync(EVIDENCE_DIR, { intermediates: true });
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
   }
-  return EVIDENCE_DIR;
+  return dir;
 }
 
 /**
@@ -95,8 +106,8 @@ export async function startRecording(): Promise<RecordingInfo | null> {
       shouldDuckAndroid: false,
     });
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    _filename = `aegis_emergency_${timestamp}.m4a`;
+    _recordingUserId = getAuthSnapshot().user?.uid ?? null;
+    _filename = buildEvidenceFilename();
 
     const { recording } = await Audio.Recording.createAsync(
       Audio.RecordingOptionsPresets.HIGH_QUALITY,
@@ -105,13 +116,14 @@ export async function startRecording(): Promise<RecordingInfo | null> {
     _recording = recording;
     _startedAt = Date.now();
 
-    console.log(`[AEGIS Audio] Recording started — file: ${_filename}`);
+    console.log(`[AEGIS Audio] Recording started — file: ${_filename} user=${_recordingUserId}`);
 
     return {
       uri: recording.getURI() ?? '',
       filename: _filename,
       startedAt: _startedAt,
       durationMs: 0,
+      userId: _recordingUserId,
     };
   } catch (err) {
     console.error('[AEGIS Audio] Failed to start recording:', err);
@@ -134,10 +146,12 @@ export async function stopRecording(): Promise<RecordingInfo | null> {
     const durationMs = _startedAt ? Date.now() - _startedAt : 0;
     const stoppedAt = Date.now();
     const filename = _filename ?? 'aegis_emergency.m4a';
+    const recordingUserId = _recordingUserId;
     let uri = sourceUri;
 
     try {
-      const dir = await ensureEvidenceDirectory();
+      const userId = recordingUserId ?? getAuthSnapshot().user?.uid ?? null;
+      const dir = await ensureEvidenceDirectory(userId);
       if (dir && sourceUri) {
         const destination = `${dir}${filename}`;
         await FileSystem.moveAsync({ from: sourceUri, to: destination });
@@ -153,6 +167,7 @@ export async function stopRecording(): Promise<RecordingInfo | null> {
       startedAt: _startedAt ?? Date.now(),
       durationMs,
       stoppedAt,
+      userId: recordingUserId,
     };
 
     console.log(
@@ -165,6 +180,7 @@ export async function stopRecording(): Promise<RecordingInfo | null> {
     _recording = null;
     _startedAt = null;
     _filename = null;
+    _recordingUserId = null;
 
     // Reset audio mode
     if (Audio) {
@@ -180,6 +196,7 @@ export async function stopRecording(): Promise<RecordingInfo | null> {
     _recording = null;
     _startedAt = null;
     _filename = null;
+    _recordingUserId = null;
     return null;
   }
 }
@@ -189,6 +206,15 @@ export async function stopRecording(): Promise<RecordingInfo | null> {
  */
 export async function playRecording(uri: string, onFinished?: () => void): Promise<void> {
   if (Platform.OS === 'web' || !Audio || !uri) return;
+
+  const currentUserId = getAuthSnapshot().user?.uid ?? null;
+  if (currentUserId) {
+    const expectedPrefix = buildEvidenceDirectory(currentUserId);
+    if (!uri.startsWith(expectedPrefix) && uri.includes(BASE_EVIDENCE_DIR)) {
+      console.warn('[AEGIS Audio] Playback blocked for file outside current user scope:', uri);
+      return;
+    }
+  }
 
   await stopPlayback();
   await Audio.setAudioModeAsync({

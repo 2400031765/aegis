@@ -35,6 +35,12 @@ import { useTranslation } from '../../src/hooks/useTranslation';
 import {
   requestAudioPermission,
 } from '../../src/services/audioService';
+import {
+  destroyNativeVoiceRecognition,
+  initNativeVoiceListeners,
+  startNativeVoiceRecognition,
+  stopNativeVoiceRecognition,
+} from '../../src/services/voiceService';
 
 const getRiskStyles = (t: (key: string, options?: Record<string, unknown>) => string): Record<Risk, { label: string; color: string; bg: string }> => ({
   low: { label: t('assistant.riskLow'), color: '#39FFA0', bg: 'rgba(57,255,160,0.12)' },
@@ -260,10 +266,35 @@ export default function AssistantScreen() {
 
   const [input, setInput] = useState('');
   const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [safewordAlertVisible, setSafewordAlertVisible] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const recognitionRef = useRef<unknown>(null);
   const transcriptRef = useRef('');
+  const voiceActiveRef = useRef(false);
+  const voiceSentRef = useRef(false);
+  const voiceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cleanupVoiceTimeout = () => {
+    if (voiceTimeoutRef.current) {
+      clearTimeout(voiceTimeoutRef.current);
+      voiceTimeoutRef.current = null;
+    }
+  };
+
+  const resetVoiceSession = () => {
+    voiceActiveRef.current = false;
+    voiceSentRef.current = false;
+    cleanupVoiceTimeout();
+    setListening(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      cleanupVoiceTimeout();
+      destroyNativeVoiceRecognition().catch(() => undefined);
+    };
+  }, []);
 
   // Hydrate stores on mount
   useEffect(() => {
@@ -329,6 +360,7 @@ const getCurrentLocation = async () => {
 
   if (!value || thinking) return;
 
+  console.log('[AEGIS Voice] AI request sent:', value);
   setInput('');
   transcriptRef.current = '';
 
@@ -339,6 +371,26 @@ const getCurrentLocation = async () => {
   await sendUserMessage(value, location);
 };
 
+  const handleNativeVoiceStop = async () => {
+    if (voiceSentRef.current) {
+      console.log('[AEGIS Voice] Voice message already sent, skipping duplicate stop');
+      return;
+    }
+
+    const spokenText = transcriptRef.current.trim() || input.trim();
+    console.log('[AEGIS Voice] Stopping voice session, transcript=', spokenText);
+    cleanupVoiceTimeout();
+    resetVoiceSession();
+
+    if (!spokenText) {
+      setVoiceError('No speech detected. Please try again.');
+      return;
+    }
+
+    voiceSentRef.current = true;
+    await onSend(spokenText);
+  };
+
   const triggerVoiceEmergencyFallback = async () => {
     if (!isOnline) {
       queueAction({
@@ -348,13 +400,6 @@ const getCurrentLocation = async () => {
     }
     startCountdown();
     router.push('/(app)/emergency/countdown');
-  };
-
-  const handleNativeVoiceStop = async () => {
-    const spokenText = transcriptRef.current.trim() || input.trim();
-    if (spokenText) {
-      await onSend(spokenText);
-    }
   };
 
   const onAction = (action: AIAction) => {
@@ -397,10 +442,13 @@ const getCurrentLocation = async () => {
 
   /**
    * Web SpeechRecognition for voice input. On native, the microphone button
-   * currently toggles a listening UI and preserves typed input for send.
+   * now uses native speech recognition to transcribe voice into the chat input.
    */
   const startListening = async () => {
+    console.log('[AEGIS Voice] Mic pressed');
+    setVoiceError(null);
     transcriptRef.current = input.trim();
+    voiceSentRef.current = false;
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const SR =
@@ -437,13 +485,71 @@ const getCurrentLocation = async () => {
     }
 
     const granted = await requestAudioPermission();
-    if (!granted) return;
+    console.log('[AEGIS Voice] Permission granted:', granted);
+    if (!granted) {
+      setVoiceError('Microphone permission is required for voice input.');
+      return;
+    }
 
+    const initialized = await initNativeVoiceListeners({
+      onSpeechStart: () => {
+        console.log('[AEGIS Voice] Listening started');
+        setListening(true);
+      },
+      onSpeechEnd: async () => {
+        console.log('[AEGIS Voice] Speech ended');
+        setListening(false);
+        await handleNativeVoiceStop();
+      },
+      onSpeechError: async (error) => {
+        console.log('[AEGIS Voice] Speech error', error);
+        setVoiceError('Speech recognition failed. Please try again.');
+        setListening(false);
+        voiceActiveRef.current = false;
+        resetVoiceSession();
+        await stopNativeVoiceRecognition();
+      },
+      onSpeechResults: (txt) => {
+        console.log('[AEGIS Voice] Transcript received:', txt);
+        transcriptRef.current = txt;
+        setInput(txt);
+      },
+      onSpeechPartialResults: (txt) => {
+        console.log('[AEGIS Voice] Partial transcript:', txt);
+        transcriptRef.current = txt;
+        setInput(txt);
+      },
+    });
+
+    if (!initialized) {
+      setVoiceError('Voice recognition is unavailable on this device.');
+      return;
+    }
+
+    const started = await startNativeVoiceRecognition('en-IN');
+    console.log('[AEGIS Voice] Recognition start result:', started);
+    if (!started) {
+      setVoiceError('Unable to start speech recognition.');
+      return;
+    }
+
+    voiceActiveRef.current = true;
     setListening(true);
+    cleanupVoiceTimeout();
+    voiceTimeoutRef.current = setTimeout(() => {
+      console.log('[AEGIS Voice] Listening timeout reached');
+      if (voiceActiveRef.current) {
+        stopListening().catch(() => undefined);
+      }
+    }, 20000);
   };
 
   const stopListening = async () => {
+    console.log('[AEGIS Voice] Stop pressed');
+    cleanupVoiceTimeout();
     setListening(false);
+    voiceActiveRef.current = false;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const r = recognitionRef.current as any;
     try { r?.stop?.(); } catch { /* ignore */ }
@@ -459,6 +565,7 @@ const getCurrentLocation = async () => {
       return;
     }
 
+    await stopNativeVoiceRecognition();
     await handleNativeVoiceStop();
   };
 
@@ -604,10 +711,19 @@ const getCurrentLocation = async () => {
                 </Pressable>
               ) : null}
             </View>
+            {voiceError ? (
+              <Text variant="label" color="#FFB800" style={styles.voiceError}>
+                {voiceError}
+              </Text>
+            ) : null}
             <Pressable
               testID="ai-mic-btn"
-              onPress={listening ? stopListening : startListening}
+              onPress={() => {
+                console.log('MIC BUTTON PRESSED');
+                (listening ? stopListening : startListening)().catch(() => undefined);
+              }}
               style={[styles.micBtn, listening && styles.micBtnActive]}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
             >
               <LinearGradient
                 colors={listening ? ['#FF2079', '#B800E6'] : ['#7000FF', '#B800E6', '#FF2079']}
@@ -760,7 +876,12 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14,
     paddingVertical: 0,
   },
-  micBtn: { width: 56, height: 56 },
+  micBtn: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   micBtnActive: {
     shadowColor: '#FF2079', shadowOpacity: 0.8, shadowRadius: 18, shadowOffset: { width: 0, height: 0 },
   },
@@ -768,5 +889,10 @@ const styles = StyleSheet.create({
     width: 56, height: 56, borderRadius: 28,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#7000FF', shadowOpacity: 0.5, shadowRadius: 16, shadowOffset: { width: 0, height: 4 },
+  },
+  voiceError: {
+    marginTop: spacing.xs,
+    marginHorizontal: spacing.screenPadding,
+    color: '#FFB800',
   },
 });

@@ -10,10 +10,11 @@
  */
 
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthSnapshot, useAuthStore } from './authStore';
+import { saveUserStorageJson, removeUserStorageKey } from '../services/userStorage';
 import { locationService, type AegisLocation } from '../services/location';
 
-const CACHE_KEY = 'aegis.safewalk_session';
+const STORAGE_KEY = 'safewalk_session';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,7 +103,15 @@ export const useSafeWalkStore = create<State & Actions>((set, get) => ({
     set({ phase: 'active', session });
 
     // Persist session for recovery
-    AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ destination, note, etaMinutes, startedAt: session.startedAt })).catch(() => undefined);
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (userId) {
+      await saveUserStorageJson(userId, STORAGE_KEY, {
+        destination,
+        note,
+        etaMinutes,
+        startedAt: session.startedAt,
+      }).catch(() => undefined);
+    }
 
     // Request location permission and get initial fix
     try {
@@ -181,13 +190,19 @@ export const useSafeWalkStore = create<State & Actions>((set, get) => ({
 
   complete: () => {
     get()._clearInterval();
-    AsyncStorage.removeItem(CACHE_KEY).catch(() => undefined);
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (userId) {
+      removeUserStorageKey(userId, STORAGE_KEY).catch(() => undefined);
+    }
     set({ phase: 'completed' });
   },
 
   cancel: () => {
     get()._clearInterval();
-    AsyncStorage.removeItem(CACHE_KEY).catch(() => undefined);
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (userId) {
+      removeUserStorageKey(userId, STORAGE_KEY).catch(() => undefined);
+    }
     set({ phase: 'cancelled', session: null });
     // Reset to idle after brief delay so UI can show cancelled state
     setTimeout(() => {
@@ -226,6 +241,15 @@ export const useSafeWalkStore = create<State & Actions>((set, get) => ({
     }
   },
 }));
+
+useAuthStore.subscribe(
+  (state) => state.user?.uid,
+  (userId, prevUserId) => {
+    if (userId !== prevUserId) {
+      useSafeWalkStore.setState({ phase: 'idle', session: null, permissionStatus: 'unknown', _tickIntervalId: null });
+    }
+  },
+);
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 

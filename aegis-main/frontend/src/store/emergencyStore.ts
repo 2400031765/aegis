@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthSnapshot, useAuthStore } from './authStore';
 import * as Battery from 'expo-battery';
 import { locationService, type AegisLocation } from '../services/location';
 import { getSelectedContacts, type TrustedContact } from './contactsStore';
-import { useAuthStore } from './authStore';
 import type { RecordingInfo } from '../services/audioService';
 import useRecordingStore from './recordingStore';
 import { buildEmergencySmsMessage, openEmergencySmsComposer } from '../services/emergencySmsService';
+import { loadUserStorageJson, saveUserStorageJson, removeUserStorageKey } from '../services/userStorage';
 
 export type EmergencyPhase = 'idle' | 'countdown' | 'active' | 'cancelled' | 'sent';
 
@@ -56,11 +56,18 @@ interface Actions {
 }
 
 const COUNTDOWN_SECONDS = 5;
-const RECORDING_KEY = 'aegis.emergency_last_recording';
+const STORAGE_KEY = 'emergency_last_recording';
 
-const persistRecordingInfo = (info: RecordingInfo | null) => {
-  if (!info) return AsyncStorage.removeItem(RECORDING_KEY);
-  return AsyncStorage.setItem(RECORDING_KEY, JSON.stringify(info));
+const persistRecordingInfo = async (info: RecordingInfo | null) => {
+  const userId = getAuthSnapshot().user?.uid ?? null;
+  if (!userId) return;
+
+  if (!info) {
+    await removeUserStorageKey(userId, STORAGE_KEY);
+    return;
+  }
+
+  await saveUserStorageJson(userId, STORAGE_KEY, info);
 };
 
 export const useEmergencyStore = create<State & Actions>((set, get) => ({
@@ -215,15 +222,25 @@ export const useEmergencyStore = create<State & Actions>((set, get) => ({
       countdown: COUNTDOWN_SECONDS,
       startedAt: null,
       durationMs: 0,
+      location: null,
+      permissionStatus: 'unknown',
       isRecording: false,
+      recordingInfo: null,
+      lastPayload: null,
+      timeline: [],
       error: null,
     }),
 
   hydrateRecording: async () => {
     // Hydrate emergency store with last saved recording (keeps compatibility)
     try {
-      const raw = await AsyncStorage.getItem(RECORDING_KEY);
-      set({ recordingInfo: raw ? JSON.parse(raw) : null });
+      const userId = getAuthSnapshot().user?.uid ?? null;
+      if (!userId) {
+        set({ recordingInfo: null });
+      } else {
+        const last = await loadUserStorageJson<RecordingInfo | null>(userId, STORAGE_KEY, null);
+        set({ recordingInfo: last });
+      }
       // also hydrate global recording store
       await useRecordingStore.getState().hydrate();
     } catch {
@@ -237,6 +254,15 @@ export const useEmergencyStore = create<State & Actions>((set, get) => ({
     await useRecordingStore.getState().clearHistory().catch(() => undefined);
   },
 }));
+
+useAuthStore.subscribe(
+  (state) => state.user?.uid,
+  (userId, prevUserId) => {
+    if (userId !== prevUserId) {
+      useEmergencyStore.getState().reset();
+    }
+  },
+);
 
 export const formatElapsed = (ms: number) => {
   const totalSec = Math.floor(ms / 1000);

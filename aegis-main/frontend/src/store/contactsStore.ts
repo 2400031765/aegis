@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthSnapshot, useAuthStore } from './authStore';
+import { loadUserStorageJson, saveUserStorageJson } from '../services/userStorage';
 
 export interface TrustedContact {
   id: string;
@@ -7,6 +8,7 @@ export interface TrustedContact {
   phone: string;
   relation?: string;
   selectedForSos?: boolean;
+  userId?: string;
 }
 
 interface State {
@@ -22,57 +24,84 @@ interface Actions {
   toggleSelected: (id: string) => Promise<void>;
 }
 
-const KEY = 'aegis.contacts';
+const STORAGE_KEY = 'contacts';
 
-const persist = (contacts: TrustedContact[]) =>
-  AsyncStorage.setItem(KEY, JSON.stringify(contacts));
+const persist = (contacts: TrustedContact[], userId: string | null) =>
+  saveUserStorageJson(userId, STORAGE_KEY, contacts);
 
 export const useContactsStore = create<State & Actions>((set, get) => ({
   contacts: [],
   hydrated: false,
 
   hydrate: async () => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (!userId) {
+      set({ contacts: [], hydrated: true });
+      return;
+    }
+
     try {
-      const raw = await AsyncStorage.getItem(KEY);
-      const contacts: TrustedContact[] = raw ? JSON.parse(raw) : [];
+      const contacts: TrustedContact[] = await loadUserStorageJson(userId, STORAGE_KEY, []);
       set({ contacts, hydrated: true });
     } catch {
-      set({ hydrated: true });
+      set({ contacts: [], hydrated: true });
     }
   },
 
   addContact: async (c) => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
+    if (!userId) {
+      return {
+        ...c,
+        id: 'tc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        selectedForSos: c.selectedForSos ?? true,
+      };
+    }
+
     const next: TrustedContact = {
       ...c,
       id: 'tc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
       selectedForSos: c.selectedForSos ?? true,
+      userId,
     };
     const contacts = [...get().contacts, next];
     set({ contacts });
-    await persist(contacts);
+    await persist(contacts, userId);
     return next;
   },
 
   updateContact: async (id, patch) => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
     const contacts = get().contacts.map((c) => (c.id === id ? { ...c, ...patch } : c));
     set({ contacts });
-    await persist(contacts);
+    await persist(contacts, userId);
   },
 
   removeContact: async (id) => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
     const contacts = get().contacts.filter((c) => c.id !== id);
     set({ contacts });
-    await persist(contacts);
+    await persist(contacts, userId);
   },
 
   toggleSelected: async (id) => {
+    const userId = getAuthSnapshot().user?.uid ?? null;
     const contacts = get().contacts.map((c) =>
       c.id === id ? { ...c, selectedForSos: !c.selectedForSos } : c,
     );
     set({ contacts });
-    await persist(contacts);
+    await persist(contacts, userId);
   },
 }));
+
+useAuthStore.subscribe(
+  (state) => state.user?.uid,
+  (userId, prevUserId) => {
+    if (userId !== prevUserId) {
+      useContactsStore.setState({ contacts: [], hydrated: false });
+    }
+  },
+);
 
 export const getSelectedContacts = (): TrustedContact[] =>
   useContactsStore.getState().contacts.filter((c) => c.selectedForSos !== false);

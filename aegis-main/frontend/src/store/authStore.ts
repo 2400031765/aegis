@@ -2,12 +2,15 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService, type AegisUser } from '../services/auth';
 import { setLocale, getDeviceLocale } from '../i18n';
+import { loadUserStorageString, saveUserStorageString } from '../services/userStorage';
 
 const KEYS = {
   user: 'aegis.user',
   language: 'aegis.language',
   onboarded: 'aegis.onboarded',
 };
+
+const USER_LANGUAGE_KEY = 'language';
 
 interface State {
   user: AegisUser | null;
@@ -46,10 +49,13 @@ export const useAuthStore = create<State & Actions>((set, get) => ({
         AsyncStorage.getItem(KEYS.language),
         AsyncStorage.getItem(KEYS.onboarded),
       ]);
-      const language = lang || getDeviceLocale();
+
+      const user = u ? (JSON.parse(u) as AegisUser) : null;
+      const userLanguage = user ? await loadUserStorageString(user.uid, USER_LANGUAGE_KEY) : null;
+      const language = userLanguage || lang || getDeviceLocale();
       setLocale(language);
       set({
-        user: u ? (JSON.parse(u) as AegisUser) : null,
+        user,
         language,
         hasOnboarded: ob === '1',
         hydrated: true,
@@ -61,7 +67,12 @@ export const useAuthStore = create<State & Actions>((set, get) => ({
 
   setLanguage: async (code) => {
     setLocale(code);
-    await AsyncStorage.setItem(KEYS.language, code);
+    const userId = get().user?.uid ?? null;
+    if (userId) {
+      await saveUserStorageString(userId, USER_LANGUAGE_KEY, code);
+    } else {
+      await AsyncStorage.setItem(KEYS.language, code);
+    }
     set({ language: code });
   },
 
@@ -77,13 +88,14 @@ signIn: async (email, password) => {
 
   try {
     const user = await authService.signIn(email, password);
-
-    console.log("LOGIN SUCCESS", user);
-
+    const userLanguage = await loadUserStorageString(user.uid, USER_LANGUAGE_KEY);
+    const language = userLanguage || getDeviceLocale();
+    setLocale(language);
     await AsyncStorage.setItem(KEYS.user, JSON.stringify(user));
 
     set({
       user,
+      language,
       loading: false,
       error: null,
     });
@@ -107,8 +119,11 @@ signIn: async (email, password) => {
     set({ loading: true, error: null });
     try {
       const user = await authService.signUp(email, password, name);
+      const userLanguage = await loadUserStorageString(user.uid, USER_LANGUAGE_KEY);
+      const language = userLanguage || getDeviceLocale();
+      setLocale(language);
       await AsyncStorage.setItem(KEYS.user, JSON.stringify(user));
-      set({ user, loading: false });
+      set({ user, language, loading: false });
       return user;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Sign up failed';
@@ -121,8 +136,11 @@ signIn: async (email, password) => {
     set({ loading: true, error: null });
     try {
       const user = await authService.signInAsGuest();
+      const userLanguage = await loadUserStorageString(user.uid, USER_LANGUAGE_KEY);
+      const language = userLanguage || getDeviceLocale();
+      setLocale(language);
       await AsyncStorage.setItem(KEYS.user, JSON.stringify(user));
-      set({ user, loading: false });
+      set({ user, language, loading: false });
       return user;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Guest sign-in failed';
@@ -135,8 +153,11 @@ signIn: async (email, password) => {
     set({ loading: true, error: null });
     try {
       const user = await authService.signInWithGoogleIdToken(idToken);
+      const userLanguage = await loadUserStorageString(user.uid, USER_LANGUAGE_KEY);
+      const language = userLanguage || getDeviceLocale();
+      setLocale(language);
       await AsyncStorage.setItem(KEYS.user, JSON.stringify(user));
-      set({ user, loading: false });
+      set({ user, language, loading: false });
       return user;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Google sign-in failed';
@@ -160,7 +181,9 @@ signIn: async (email, password) => {
   signOut: async () => {
     await authService.signOut();
     await AsyncStorage.removeItem(KEYS.user);
-    set({ user: null });
+    const language = getDeviceLocale();
+    setLocale(language);
+    set({ user: null, language });
   },
 
   clearError: () => set({ error: null }),
