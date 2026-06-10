@@ -3,7 +3,16 @@
 # IDE and editors
 .idea/
 .vscode/
+__pycache__/
+*.pyc
+.env
 
+node_modules/
+.expo/
+.metro-cache/
+
+dist/
+build/
 # Dependencies
 node_modules/
 /node_modules
